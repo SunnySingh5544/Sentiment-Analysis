@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViewPoint — YouTube Sentiment Analyser</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f3ee; --surface:#fff; --surface2:#f0ede6; --surface3:#e8e4dc;
+  --border:#e2ddd5; --text:#1a1814; --muted:#8a8070; --muted2:#b5b0a8;
+  --pos:#1a7a4a; --pos-bg:#e8f5ee; --pos-border:#a8dbbf;
+  --neg:#c0392b; --neg-bg:#fdf0ee; --neg-border:#f0c4be;
+  --neu:#5a6a7e; --neu-bg:#eef1f5; --neu-border:#c8d3de;
+  --accent:#c8773a; --accent2:#8b4513;
+  --accent-light:#fef6ef; --accent-border:#f5d9c0;
+  --shadow:0 2px 16px rgba(26,24,20,.07);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+.top-bar{height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#e8a96a,var(--accent),var(--accent2));background-size:200% 100%;animation:shimmer 3s linear infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.container{max-width:860px;margin:0 auto;padding:0 24px}
+
+/* ── Header ── */
+header{padding:52px 0 40px;text-align:center}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:20px}
+.eyebrow::before,.eyebrow::after{content:'';width:32px;height:1px;background:var(--accent);opacity:.35}
+h1{font-family:'Playfair Display',serif;font-size:clamp(34px,5.5vw,58px);font-weight:800;line-height:1.07;letter-spacing:-.025em;margin-bottom:14px}
+h1 em{font-style:italic;color:var(--accent)}
+.subtitle{font-size:15px;color:var(--muted);font-weight:300;max-width:440px;margin:0 auto;line-height:1.7}
+
+/* ── Search ── */
+.search-box{margin-bottom:16px}
+.search-wrap{display:flex;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:8px;transition:border-color .25s,box-shadow .25s;box-shadow:var(--shadow)}
+.search-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px rgba(200,119,58,.12),var(--shadow)}
+input[type=text]{flex:1;background:none;border:none;outline:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--text);padding:13px 16px}
+input::placeholder{color:var(--muted2)}
+.analyse-btn{background:var(--text);color:#fff;border:none;border-radius:10px;padding:13px 30px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;letter-spacing:.03em;cursor:pointer;transition:all .2s;white-space:nowrap}
+.analyse-btn:hover:not(:disabled){background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,69,19,.25)}
+.analyse-btn:active:not(:disabled){transform:translateY(0)}
+.analyse-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Status ── */
+#status-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:18px;padding:0 4px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:background .4s}
+.status-dot.online{background:var(--pos);animation:pdot 2s ease-in-out infinite}
+.status-dot.offline{background:var(--neg)}
+@keyframes pdot{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ── Preview ── */
+#preview-card{display:none;background:var(--surface);border:1.5px solid var(--accent);border-radius:18px;padding:18px;margin-bottom:20px;box-shadow:var(--shadow);animation:fadeUp .3s ease}
+.preview-inner{display:flex;gap:18px;align-items:center}
+.preview-thumb{width:168px;height:96px;object-fit:cover;border-radius:11px;flex-shrink:0;background:var(--surface2)}
+.preview-info{flex:1;min-width:0}
+.type-pill{display:inline-flex;align-items:center;gap:5px;background:var(--accent-light);border:1px solid var(--accent-border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+.preview-channel{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.channel-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.channel-name{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;line-height:1.35;margin-bottom:10px;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.preview-meta{display:flex;gap:16px;flex-wrap:wrap}
+.pmeta{font-size:12px;color:var(--muted)}
+.pmeta strong{color:var(--text);font-weight:600}
+.preview-loading{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--muted)}
+.mini-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Error ── */
+#error{display:none;background:var(--neg-bg);border:1px solid var(--neg-border);border-radius:12px;padding:12px 16px;color:var(--neg);font-size:13px;margin-bottom:16px;font-weight:500}
+
+/* ── Loading ── */
+#loading{display:none;text-align:center;padding:70px 0}
+.loader{display:inline-flex;gap:7px;margin-bottom:18px}
+.loader span{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:bounce 1.2s ease-in-out infinite}
+.loader span:nth-child(2){animation-delay:.18s}
+.loader span:nth-child(3){animation-delay:.36s}
+@keyframes bounce{0%,80%,100%{transform:scale(.55);opacity:.35}40%{transform:scale(1);opacity:1}}
+.loading-msg{color:var(--muted);font-size:14px;font-weight:300}
+
+/* ── Results ── */
+#results{display:none;animation:fadeUp .5s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Divider ── */
+.divider{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.divider-line{flex:1;height:1px;background:var(--border)}
+.divider-label{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted2)}
+
+/* ── Card ── */
+.video-card{display:flex;gap:18px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;align-items:flex-start;box-shadow:var(--shadow)}
+.thumb{width:156px;height:90px;object-fit:cover;border-radius:10px;flex-shrink:0}
+.video-info{flex:1;min-width:0}
+.video-channel-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.ch-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.video-channel{font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.09em}
+.video-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;line-height:1.35;margin-bottom:10px}
+.video-stats{display:flex;gap:18px;flex-wrap:wrap}
+.vstat{font-size:12px;color:var(--muted)}
+.vstat strong{color:var(--text);font-weight:600}
+
+/* ── Model badge ── */
+.model-badge{display:inline-flex;align-items:center;gap:7px;background:var(--accent-light);border:1px solid var(--accent-border);border-radius:9px;padding:6px 14px;font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:18px}
+.model-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pdot 2s ease-in-out infinite}
+
+/* ── Verdict ── */
+.verdict{border-radius:16px;padding:22px 26px;margin-bottom:14px;border:1.5px solid;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.verdict.positive{background:var(--pos-bg);border-color:var(--pos-border)}
+.verdict.negative{background:var(--neg-bg);border-color:var(--neg-border)}
+.verdict.neutral{background:var(--neu-bg);border-color:var(--neu-border)}
+.verdict-eye{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-bottom:5px;opacity:.55}
+.verdict-text{font-family:'Playfair Display',serif;font-size:24px;font-weight:800}
+.verdict.positive .verdict-text{color:var(--pos)}
+.verdict.negative .verdict-text{color:var(--neg)}
+.verdict.neutral .verdict-text{color:var(--neu)}
+.verdict-score{font-family:'Playfair Display',serif;font-size:52px;font-weight:800;opacity:.08;line-height:1;user-select:none}
+
+/* ── Stats row ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center;box-shadow:var(--shadow)}
+.stat-num{font-family:'Playfair Display',serif;font-size:32px;font-weight:700;line-height:1;margin-bottom:5px}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.stat-card.pos .stat-num{color:var(--pos)}
+.stat-card.neg .stat-num{color:var(--neg)}
+.stat-card.neu .stat-num{color:var(--neu)}
+
+/* ── Bars ── */
+.bars-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card-heading{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.bar-row{margin-bottom:14px}
+.bar-row:last-child{margin-bottom:0}
+.bar-meta{display:flex;justify-content:space-between;margin-bottom:7px;align-items:baseline}
+.bar-name{font-size:13px;font-weight:600}
+.bar-right{font-size:11px;color:var(--muted2)}
+.bar-track{height:7px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1)}
+.bar-fill.pos{background:linear-gradient(90deg,var(--pos),#2ecc71)}
+.bar-fill.neg{background:linear-gradient(90deg,var(--neg),#e74c3c)}
+.bar-fill.neu{background:linear-gradient(90deg,var(--neu),#7f8c8d)}
+
+/* ── Per-video table (playlist) ── */
+.per-video-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;margin-bottom:14px;box-shadow:var(--shadow)}
+.pv-item{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--border)}
+.pv-item:last-child{border-bottom:none;padding-bottom:0}
+.pv-num{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--muted2);width:26px;flex-shrink:0;text-align:center}
+.pv-info{flex:1;min-width:0}
+.pv-title{font-size:13px;font-weight:600;line-height:1.4;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-title a{color:var(--text);text-decoration:none}
+.pv-title a:hover{color:var(--accent)}
+.pv-sub{font-size:11px;color:var(--muted)}
+.pv-badge{flex-shrink:0}
+.pv-pill{font-size:11px;font-weight:700;padding:3px 11px;border-radius:6px;white-space:nowrap}
+.pv-pill.positive{background:var(--pos-bg);color:var(--pos)}
+.pv-pill.negative{background:var(--neg-bg);color:var(--neg)}
+.pv-pill.neutral{background:var(--neu-bg);color:var(--neu)}
+.pv-pill.none{background:var(--surface2);color:var(--muted)}
+
+/* ── Comments ── */
+.comments-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;margin-bottom:14px;box-shadow:var(--shadow)}
+.tab-row{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.tab{padding:7px 16px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:none;color:var(--muted);font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s}
+.tab:hover{border-color:var(--muted);color:var(--text)}
+.tab.act-pos{background:var(--pos-bg);border-color:var(--pos-border);color:var(--pos)}
+.tab.act-neg{background:var(--neg-bg);border-color:var(--neg-border);color:var(--neg)}
+.comment-list{display:flex;flex-direction:column;gap:10px}
+.comment-item{background:var(--surface2);border-radius:11px;padding:13px 16px;border-left:3px solid;font-size:13px;line-height:1.65;color:#3d3830;transition:background .2s}
+.comment-item:hover{background:var(--surface3)}
+.comment-item.pos{border-color:var(--pos)}
+.comment-item.neg{border-color:var(--neg)}
+.comment-likes{margin-top:6px;font-size:11px;color:var(--muted2);font-weight:500}
+
+/* ── Table ── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;margin-bottom:56px;overflow-x:auto;box-shadow:var(--shadow)}
+.comment-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.comment-table th{text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.comment-table td{padding:10px;border-bottom:1px solid var(--border);color:#4a453e;line-height:1.55;vertical-align:top}
+.comment-table tr:last-child td{border-bottom:none}
+.comment-table tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.badge.pos{background:var(--pos-bg);color:var(--pos)}
+.badge.neg{background:var(--neg-bg);color:var(--neg)}
+.badge.neu{background:var(--neu-bg);color:var(--neu)}
+
+@media(max-width:600px){
+  .video-card,.preview-inner{flex-direction:column}
+  .thumb,.preview-thumb{width:100%;height:190px}
+  .stats-row{gap:8px}
+  .stat-num{font-size:26px}
+  .verdict-score{display:none}
+}
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="container">
+
+  <header>
+    <div class="eyebrow">ViewPoint</div>
+    <h1>What does the audience<br><em>really</em> think?</h1>
+    <p class="subtitle">Paste any YouTube video <strong>or playlist</strong> URL — instant sentiment analysis powered by your custom model.</p>
+  </header>
+
+  <div id="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Checking backend...</span>
+  </div>
+
+  <div class="search-box">
+    <div class="search-wrap">
+      <input type="text" id="urlInput"
+        placeholder="Paste a YouTube video or playlist URL..."
+        oninput="onUrlInput(this.value)"
+        autocomplete="off" spellcheck="false"
+      />
+      <button class="analyse-btn" id="analyseBtn" onclick="runAnalyse()" disabled>Analyse</button>
+    </div>
+  </div>
+
+  <div id="preview-card">
+    <div id="preview-loading" class="preview-loading">
+      <div class="mini-spinner"></div>
+      <span>Loading info...</span>
+    </div>
+    <div id="preview-content" class="preview-inner" style="display:none">
+      <img id="prev-thumb" class="preview-thumb" src="" alt="">
+      <div class="preview-info">
+        <div id="prev-pill"></div>
+        <div class="preview-channel">
+          <div class="channel-dot"></div>
+          <div class="channel-name" id="prev-channel"></div>
+        </div>
+        <div class="preview-title" id="prev-title"></div>
+        <div class="preview-meta" id="prev-meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="loading">
+    <div class="loader"><span></span><span></span><span></span></div>
+    <p class="loading-msg" id="loadingMsg">Collecting comments...</p>
+  </div>
+
+  <div id="results"></div>
+
+</div>
+<script>
+const BACKEND = 'http://localhost:5000';
+
+// ── Utils ──
+const fmt = n => {
+  if (n == null) return '—';
+  if (n >= 1e6)  return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3)  return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+};
+
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function detectType(url) {
+  const hasList  = /[?&]list=([A-Za-z0-9_-]+)/.test(url);
+  const hasVideo = /(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/.test(url);
+  if (hasVideo && hasList && url.includes('v=')) return 'video';
+  if (hasList)  return 'playlist';
+  if (hasVideo) return 'video';
+  return null;
+}
+
+// ── Health check ──
+(async () => {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  try {
+    const r = await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(4000) });
+    const d = await r.json();
+    if (d.status === 'running') {
+      dot.className  = 'status-dot online';
+      txt.textContent = 'Backend connected · API key loaded';
+    }
+  } catch {
+    dot.className  = 'status-dot offline';
+    txt.textContent = 'Backend offline — run: py App.py';
+  }
+})();
+
+// ── URL input ──
+let previewTimer = null;
+function onUrlInput(val) {
+  const type = detectType(val.trim());
+  const btn  = document.getElementById('analyseBtn');
+  const card = document.getElementById('preview-card');
+  document.getElementById('error').style.display   = 'none';
+  document.getElementById('results').style.display = 'none';
+
+  if (!type) { card.style.display='none'; btn.disabled=true; return; }
+
+  card.style.display = 'block';
+  document.getElementById('preview-loading').style.display = 'flex';
+  document.getElementById('preview-content').style.display = 'none';
+  btn.disabled = true;
+
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => fetchPreview(val.trim()), 600);
+}
+
+async function fetchPreview(url) {
+  try {
+    const res = await fetch(`${BACKEND}/preview`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url}), signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) { fallbackPreview(url); return; }
+    renderPreview(await res.json());
+  } catch { fallbackPreview(url); }
+}
+
+function renderPreview(d) {
+  document.getElementById('prev-thumb').src = d.thumbnail || '';
+  document.getElementById('prev-channel').textContent = d.channel || '';
+  document.getElementById('prev-title').textContent   = d.title   || '';
+
+  // pill
+  document.getElementById('prev-pill').innerHTML = d.type === 'playlist'
+    ? `<div class="type-pill">▶ Playlist · ${d.video_count} videos</div>`
+    : '';
+
+  // meta
+  document.getElementById('prev-meta').innerHTML = d.type === 'playlist'
+    ? `<div class="pmeta"><strong>${fmt(d.video_count)}</strong> videos</div>`
+    : `<div class="pmeta"><strong>${fmt(d.views)}</strong> views</div>
+       <div class="pmeta"><strong>${fmt(d.likes)}</strong> likes</div>`;
+
+  document.getElementById('preview-loading').style.display = 'none';
+  document.getElementById('preview-content').style.display = 'flex';
+  document.getElementById('analyseBtn').disabled = false;
+}
+
+function fallbackPreview(url) {
+  const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  document.getElementById('prev-thumb').src = m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : '';
+  document.getElementById('prev-channel').textContent = 'Backend offline';
+  document.getElementById('prev-title').textContent   = 'Start backend to load full info';
+  document.getElementById('prev-pill').innerHTML = '';
+  document.getElementById('prev-meta').innerHTML = '';
+  document.getElementById('preview-loading').style.display = 'none';
+  document.getElementById('preview-content').style.display = 'flex';
+  document.getElementById('analyseBtn').disabled = false;
+}
+
+// ── Analyse ──
+const MSGS = ['Fetching playlist videos...','Collecting comments...','Running your model...','Building report...'];
+let msgIdx=0, msgTimer;
+
+async function runAnalyse() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+
+  const btn = document.getElementById('analyseBtn');
+  btn.disabled = true;
+  document.getElementById('error').style.display    = 'none';
+  document.getElementById('results').style.display  = 'none';
+  document.getElementById('loading').style.display  = 'block';
+  document.getElementById('preview-card').style.display = 'none';
+
+  msgIdx = 0;
+  document.getElementById('loadingMsg').textContent = MSGS[0];
+  msgTimer = setInterval(() => {
+    msgIdx = (msgIdx+1) % MSGS.length;
+    document.getElementById('loadingMsg').textContent = MSGS[msgIdx];
+  }, 2000);
+
+  try {
+    const res = await fetch(`${BACKEND}/analyse`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url}),
+      signal: AbortSignal.timeout(90000),   // playlists can take a while
+    });
+
+    clearInterval(msgTimer);
+    document.getElementById('loading').style.display = 'none';
+
+    if (!res.ok) {
+      showError((await res.json()).error || 'Something went wrong.');
+      btn.disabled = false;
+      return;
+    }
+
+    const data = await res.json();
+    btn.disabled = false;
+    data.type === 'playlist' ? renderPlaylist(data) : renderVideo(data);
+
+  } catch(e) {
+    clearInterval(msgTimer);
+    document.getElementById('loading').style.display = 'none';
+    btn.disabled = false;
+    showError('Cannot reach backend. Make sure it is running: py App.py');
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+// ── Shared render helpers ──
+function vcls(overall) {
+  return overall.toLowerCase().includes('positive') ? 'positive'
+       : overall.toLowerCase().includes('negative') ? 'negative'
+       : 'neutral';
+}
+
+function renderBars(s, pfx) {
+  return `<div class="bars-card">
+    <div class="card-heading">Sentiment Breakdown</div>
+    <div class="bar-row">
+      <div class="bar-meta"><span class="bar-name" style="color:var(--pos)">Positive</span><span class="bar-right">${s.positive} · ${s.pos_pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill pos" id="${pfx}bp"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-meta"><span class="bar-name" style="color:var(--neg)">Negative</span><span class="bar-right">${s.negative} · ${s.neg_pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill neg" id="${pfx}bn"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-meta"><span class="bar-name" style="color:var(--neu)">Neutral</span><span class="bar-right">${s.neutral} · ${s.neu_pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill neu" id="${pfx}bnu"></div></div>
+    </div>
+  </div>`;
+}
+
+function animateBars(s, pfx) {
+  setTimeout(()=>{
+    document.getElementById(pfx+'bp').style.width  = s.pos_pct+'%';
+    document.getElementById(pfx+'bn').style.width  = s.neg_pct+'%';
+    document.getElementById(pfx+'bnu').style.width = s.neu_pct+'%';
+  }, 120);
+}
+
+function renderTopComments() {
+  return `<div class="comments-card">
+    <div class="card-heading">Top Comments</div>
+    <div class="tab-row">
+      <button class="tab act-pos" onclick="showCmts('pos',this)">Most liked positive</button>
+      <button class="tab"         onclick="showCmts('neg',this)">Most liked negative</button>
+    </div>
+    <div class="comment-list" id="cmt-display"></div>
+  </div>`;
+}
+
+function renderTable(comments) {
+  return `<div class="table-card">
+    <div class="card-heading">All ${comments.length} analysed comments</div>
+    <table class="comment-table">
+      <thead><tr>
+        <th style="width:52%">Comment</th>
+        <th>Sentiment</th><th>Confidence</th><th>Likes</th>
+      </tr></thead>
+      <tbody>${comments.map(c=>`
+        <tr>
+          <td>${esc(c.text)}</td>
+          <td><span class="badge ${c.sentiment==='positive'?'pos':c.sentiment==='negative'?'neg':'neu'}">${c.sentiment}</span></td>
+          <td style="font-weight:700;color:${c.score>.1?'var(--pos)':c.score<-.1?'var(--neg)':'var(--neu)'}">${Math.round(Math.abs(c.score)*100)}%</td>
+          <td style="color:var(--muted);font-weight:500">${c.likes.toLocaleString()}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function div(label) {
+  return `<div class="divider"><div class="divider-line"></div><div class="divider-label">${label}</div><div class="divider-line"></div></div>`;
+}
+
+// ── Render single video ──
+function renderVideo(data) {
+  const v=data.video, s=data.stats, vc=vcls(s.overall);
+  const sd = s.avg_score>=0 ? '+'+s.avg_score.toFixed(3) : s.avg_score.toFixed(3);
+
+  document.getElementById('results').innerHTML = `
+    ${div('Video')}
+    <div class="video-card">
+      <img class="thumb" src="${esc(v.thumbnail)}" alt="" onerror="this.style.display='none'">
+      <div class="video-info">
+        <div class="video-channel-row"><div class="ch-dot"></div><div class="video-channel">${esc(v.channel)}</div></div>
+        <div class="video-title">${esc(v.title)}</div>
+        <div class="video-stats">
+          <div class="vstat"><strong>${fmt(v.views)}</strong> views</div>
+          <div class="vstat"><strong>${fmt(v.likes)}</strong> likes</div>
+          <div class="vstat"><strong>${s.total}</strong> comments read</div>
+        </div>
+      </div>
+    </div>
+    <div class="model-badge"><div class="model-dot"></div>${esc(data.model_used)}</div>
+    ${div('Verdict')}
+    <div class="verdict ${vc}">
+      <div><div class="verdict-eye">Overall Sentiment</div><div class="verdict-text">${esc(s.overall)}</div></div>
+      <div class="verdict-score">${sd}</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card pos"><div class="stat-num">${s.pos_pct}%</div><div class="stat-label">Positive</div></div>
+      <div class="stat-card neg"><div class="stat-num">${s.neg_pct}%</div><div class="stat-label">Negative</div></div>
+      <div class="stat-card neu"><div class="stat-num">${s.neu_pct}%</div><div class="stat-label">Neutral</div></div>
+    </div>
+    ${renderBars(s,'v')}
+    ${div('Top Comments')}
+    ${renderTopComments()}
+    ${div('All Comments')}
+    ${renderTable(s.all_comments)}`;
+
+  finalise(s, 'v');
+}
+
+// ── Render playlist ──
+function renderPlaylist(data) {
+  const pl=data.playlist, s=data.stats, vc=vcls(s.overall);
+  const sd = s.avg_score>=0 ? '+'+s.avg_score.toFixed(3) : s.avg_score.toFixed(3);
+
+  const pvRows = data.per_video.map((v,i)=>{
+    const ovc  = v.stats ? vcls(v.stats.overall) : 'none';
+    const oval = v.stats ? v.stats.overall : 'No comments';
+    const sub  = v.stats ? `${v.stats.total} comments` : 'Comments disabled';
+    return `<div class="pv-item">
+      <div class="pv-num">${i+1}</div>
+      <div class="pv-info">
+        <div class="pv-title"><a href="${esc(v.url)}" target="_blank">${esc(v.title)}</a></div>
+        <div class="pv-sub">${sub}</div>
+      </div>
+      <div class="pv-badge"><span class="pv-pill ${ovc}">${oval}</span></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('results').innerHTML = `
+    ${div('Playlist')}
+    <div class="video-card">
+      <img class="thumb" src="${esc(pl.thumbnail)}" alt="" onerror="this.style.display='none'">
+      <div class="video-info">
+        <div class="video-channel-row"><div class="ch-dot"></div><div class="video-channel">${esc(pl.channel)}</div></div>
+        <div class="video-title">${esc(pl.title)}</div>
+        <div class="video-stats">
+          <div class="vstat"><strong>${pl.video_count}</strong> videos analysed</div>
+          <div class="vstat"><strong>${s.total}</strong> total comments read</div>
+        </div>
+      </div>
+    </div>
+    <div class="model-badge"><div class="model-dot"></div>${esc(data.model_used)}</div>
+    ${div('Overall Verdict')}
+    <div class="verdict ${vc}">
+      <div><div class="verdict-eye">Playlist Sentiment</div><div class="verdict-text">${esc(s.overall)}</div></div>
+      <div class="verdict-score">${sd}</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card pos"><div class="stat-num">${s.pos_pct}%</div><div class="stat-label">Positive</div></div>
+      <div class="stat-card neg"><div class="stat-num">${s.neg_pct}%</div><div class="stat-label">Negative</div></div>
+      <div class="stat-card neu"><div class="stat-num">${s.neu_pct}%</div><div class="stat-label">Neutral</div></div>
+    </div>
+    ${renderBars(s,'p')}
+    ${div('Per Video Breakdown')}
+    <div class="per-video-card">
+      <div class="card-heading">Sentiment for each video (first ${data.per_video.length} analysed)</div>
+      ${pvRows}
+    </div>
+    ${div('Top Comments')}
+    ${renderTopComments()}
+    ${div('All Comments')}
+    ${renderTable(s.all_comments)}`;
+
+  finalise(s, 'p');
+}
+
+function finalise(s, pfx) {
+  window._pos = s.top_positive;
+  window._neg = s.top_negative;
+  document.getElementById('results').style.display = 'block';
+  showCmts('pos', document.querySelector('.tab.act-pos'));
+  animateBars(s, pfx);
+  document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function showCmts(type, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.className='tab');
+  btn.className = 'tab '+(type==='pos'?'act-pos':'act-neg');
+  const list = type==='pos' ? window._pos : window._neg;
+  const cls  = type==='pos' ? 'pos' : 'neg';
+  if (!list?.length) {
+    document.getElementById('cmt-display').innerHTML =
+      `<div style="color:var(--muted);font-size:13px;padding:8px 0">No ${type==='pos'?'positive':'negative'} comments found.</div>`;
+    return;
+  }
+  document.getElementById('cmt-display').innerHTML = list.map(c=>`
+    <div class="comment-item ${cls}">
+      ${esc(c.text)}
+      <div class="comment-likes">♥ ${c.likes.toLocaleString()} likes</div>
+    </div>`).join('');
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e=>{
+  if (e.key==='Enter' && !document.getElementById('analyseBtn').disabled) runAnalyse();
+});
+</script>
+</body>
+</html>
