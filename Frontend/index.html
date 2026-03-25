@@ -248,7 +248,10 @@ input::placeholder{color:var(--muted2)}
 
 </div>
 <script>
-const BACKEND = 'http://localhost:5000';
+const BACKEND = 
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://sentiment-analysis-backend-five.vercel.app";
 
 // ── Utils ──
 const fmt = n => {
