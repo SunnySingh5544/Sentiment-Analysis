@@ -14,7 +14,7 @@ API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 if not API_KEY:
     print("ERROR: YOUTUBE_API_KEY not found in .env file")
-    exit(1)
+    # exit(1)
 else:
     print(f"✓ API Key loaded")
 
