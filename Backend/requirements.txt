@@ -1,0 +1,6 @@
+flask
+flask-cors
+gunicorn
+google-api-python-client
+python-dotenv
+scikit-learn
